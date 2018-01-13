@@ -80,7 +80,7 @@ class TwoLayerNet(object):
           names to gradients of the loss with respect to those parameters.
         """
         scores = None
-        # Unpack variables from the params dictionary
+        # Unhttp://localhost:8888/edit/cs231n/classifiers/fc_net.py#pack variables from the params dictionary
         W1, b1 = self.params['W1'], self.params['b1']
         W2, b2 = self.params['W2'], self.params['b2']
         reg = self.reg
@@ -92,8 +92,13 @@ class TwoLayerNet(object):
         # class scores for X and storing them in the scores variable.              #
         ############################################################################
         x_re = X.reshape(N,D) 
-        hidden_layer = np.maximum(0, x_re.dot(W1) + b1) # ReLU activation  
-        scores = hidden_layer.dot(W2) + b2
+        
+        # ручная реализация 
+        #hidden_layer = np.maximum(0, x_re.dot(W1) + b1) # ReLU activation  
+        #scores = hidden_layer.dot(W2) + b2
+        
+        out1, cache1 = affine_relu_forward(x_re, W1, b1)
+        scores, cache2 = affine_forward(out1, W2, b2)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -113,6 +118,8 @@ class TwoLayerNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
+        '''
+        # ручная реализация
         scores -= np.max(scores, axis=1, keepdims=True)  #to avoid numerical instability
         scores_exp = np.sum(np.exp(scores), axis=1, keepdims=True)
         softmax = np.exp(scores)/scores_exp
@@ -135,16 +142,20 @@ class TwoLayerNet(object):
         # finally into W,b
         grads['W1'] = np.dot(x_re.T, dhidden)
         grads['b1'] = np.sum(dhidden, axis=0)
-
+        '''
+        
+        loss, dscores = softmax_loss(scores, y)
+        loss_reg = 0.5*reg * np.sum(W2 * W2) + 0.5*reg * np.sum(W1 * W1)
+        loss += loss_reg
+        
+        dh, dW2, db2 = affine_backward(dscores, cache2)
+        dx, dW1, db1 = affine_relu_backward(dh, cache1)
+        
+        grads['W2'] = dW2
+        grads['b2'] = db2
+        grads['W1'] = dW1
+        grads['b1'] = db1
         # add regularization gradient contribution
-        '''
-        print("grads['W2'].shape",grads['W2'].shape)
-        print("W2.shape", W2.shape)
-        print("reg", reg)
-        print("-"*30)
-        print("grads['W1'].shape",grads['W1'].shape)
-        print("W1.shape", W1.shape)
-        '''
         grads['W2'] += reg * W2
         grads['W1'] += reg * W1
         ############################################################################
@@ -287,7 +298,14 @@ class FullyConnectedNet(object):
         L = len(self.hidden_dims)
         W=[0]
         b=[0]
-        hidden_layer=[0]
+        out=[0]
+        cache=[0]
+        dout=[0]
+        '''
+        out=np.zeros(L+1)
+        cache=np.zeros(L+1)
+        dout=np.zeros(L+1)
+        '''
         for i in range(L+1):
             W.append(self.params['W'+str(i+1)])
             b.append(self.params['b'+str(i+1)])
@@ -309,12 +327,28 @@ class FullyConnectedNet(object):
         # self.bn_params[1] to the forward pass for the second batch normalization #
         # layer, etc.                                                              #
         ############################################################################
-        #Учесть все номера весов W и b
         x_re = X.reshape(N,D)
+        '''
+        # ручная реализация
         hidden_layer.append(np.maximum(0, x_re.dot(W[1]) + b[1])) # ReLU activation 
         for i in range(L-1):
             hidden_layer.append(np.maximum(0, hidden_layer[i+1].dot(W[i+2]) + b[i+2])) # ReLU activation  
         scores = hidden_layer[L].dot(W[L+1]) + b[L+1]
+        '''
+        #out[1], cache[1] = affine_relu_forward(x_re, W[1], b[1])
+        out_el, cache_el = affine_relu_forward(x_re, W[1], b[1])
+        out.append(out_el)
+        cache.append(cache_el)
+        
+        for i in range(L-1):
+            #out[i+2], cache[i+2] = affine_relu_forward(out[i+1], W[i+2], b[i+2])
+            out_el, cache_el = affine_relu_forward(out[i+1], W[i+2], b[i+2])
+            out.append(out_el)
+            cache.append(cache_el)
+            
+        #scores, cache[L+1] = affine_forward(out[L], W[L+1], b[L+1])
+        scores, cache_el = affine_forward(out[L], W[L+1], b[L+1])
+        cache.append(cache_el)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -337,6 +371,8 @@ class FullyConnectedNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
+        '''
+        # ручная реализация
         scores -= np.max(scores, axis=1, keepdims=True)  #to avoid numerical instability
         scores_exp = np.sum(np.exp(scores), axis=1, keepdims=True)
         softmax = np.exp(scores)/scores_exp
@@ -367,6 +403,29 @@ class FullyConnectedNet(object):
         # W1,b1
         grads['W1'] = np.dot(x_re.T, dhidden) + reg*W[1]
         grads['b1'] = np.sum(dhidden, axis=0)
+        '''
+        # loss
+        loss, dscores = softmax_loss(scores, y)
+        loss_reg = 0
+        for i in range(L+1):
+            loss_reg += 0.5*reg * np.sum(W[L+1-i] * W[L+1-i])
+        loss += loss_reg
+        
+        # W3,b3
+        #dout[L], dW, db = affine_backward(dscores, cache[L+1])
+        dout_el, dW, db = affine_backward(dscores, cache[L+1])
+        dout.append(dout_el)
+        
+        grads['W'+str(L+1)] = dW + reg*W[L+1]
+        grads['b'+str(L+1)] = db
+        
+        # W2,b2; W1,b1
+        for i in range(L):
+            #dout[L-i-1], dW, db = affine_relu_backward(dout[L-i], cache[L-i])
+            dout_el, dW, db = affine_relu_backward(dout[i+1], cache[L-i])
+            dout.append(dout_el)
+            grads['W'+str(L-i)] = dW + reg*W[L-i]
+            grads['b'+str(L-i)] = db
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
