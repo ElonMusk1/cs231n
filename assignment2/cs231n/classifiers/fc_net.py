@@ -340,17 +340,29 @@ class FullyConnectedNet(object):
             out_el, cache_el = affine_batchnorm_relu_forward(x_re, W[1], b[1], gamma[1], beta[1], self.bn_params[0])
         else:
             out_el, cache_el = affine_relu_forward(x_re, W[1], b[1])
+            
         out.append(out_el)
         cache.append(cache_el)
         
+        if self.use_dropout:
+            out_el, cache_el = dropout_forward(out_el, self.dropout_param)
+            out.append(out_el)
+            cache.append(cache_el)
+
         for i in range(L-1):
             #out[i+2], cache[i+2] = affine_relu_forward(out[i+1], W[i+2], b[i+2])
             if self.use_batchnorm:
                 out_el, cache_el = affine_batchnorm_relu_forward(out[i+1], W[i+2], b[i+2], gamma[i+2], beta[i+2], self.bn_params[i+1])
             else:    
                 out_el, cache_el = affine_relu_forward(out[i+1], W[i+2], b[i+2])
+                
             out.append(out_el)
             cache.append(cache_el)
+            
+            if self.use_dropout:
+                out_el, cache_el = dropout_forward(out_el, self.dropout_param)    
+                out.append(out_el)
+                cache.append(cache_el)
             
         #scores, cache[L+1] = affine_forward(out[L], W[L+1], b[L+1])
         '''
@@ -359,7 +371,10 @@ class FullyConnectedNet(object):
         else:
             scores, cache_el = affine_forward(out[L], W[L+1], b[L+1])
         '''
-        scores, cache_el = affine_forward(out[L], W[L+1], b[L+1])
+        if self.use_dropout:
+            scores, cache_el = affine_forward(out[2*L], W[L+1], b[L+1])
+        else:
+            scores, cache_el = affine_forward(out[L], W[L+1], b[L+1])
         cache.append(cache_el)
         
         
@@ -434,22 +449,47 @@ class FullyConnectedNet(object):
         else:    
             dout_el, dW, db = affine_backward(dscores, cache[L+1])
         '''
-        dout_el, dW, db = affine_backward(dscores, cache[L+1])
-        dout.append(dout_el)
-        
+
+        if self.use_dropout:
+            dout_el, dW, db = affine_backward(dscores, cache[2*L+1])
+            dout.append(dout_el)
+            dout_el = dropout_backward(dout_el, cache[2*L])
+            dout.append(dout_el)
+        else:
+            dout_el, dW, db = affine_backward(dscores, cache[L+1])
+            dout.append(dout_el)
+             
         grads['W'+str(L+1)] = dW + reg*W[L+1]
         grads['b'+str(L+1)] = db
         
         # W2,b2; W1,b1
         for i in range(L):
             #dout[L-i-1], dW, db = affine_relu_backward(dout[L-i], cache[L-i])
-            if self.use_batchnorm:
-                dout_el, dW, db, dgamma, dbeta = affine_batchnorm_relu_backward(dout[i+1], cache[L-i])
-                grads['gamma'+str(L-i)] = dgamma
-                grads['beta'+str(L-i)] = dbeta
-            else:    
-                dout_el, dW, db = affine_relu_backward(dout[i+1], cache[L-i])
-            dout.append(dout_el)
+            if self.use_dropout:
+                if self.use_batchnorm:
+                    dout_el, dW, db, dgamma, dbeta = affine_batchnorm_relu_backward(dout[2*i+2], cache[2*L-2*i-1])
+                    grads['gamma'+str(L-i)] = dgamma
+                    grads['beta'+str(L-i)] = dbeta
+                else:    
+                    dout_el, dW, db = affine_relu_backward(dout[2*i+2], cache[2*L-2*i-1])
+                dout.append(dout_el)
+                
+                if i<(L-1):
+                    dout_el = dropout_backward(dout[i+3], cache[2*L-i-2])
+                    dout.append(dout_el)
+
+            else:
+                if self.use_batchnorm:
+                    dout_el, dW, db, dgamma, dbeta = affine_batchnorm_relu_backward(dout[i+1], cache[L-i])
+                    grads['gamma'+str(L-i)] = dgamma
+                    grads['beta'+str(L-i)] = dbeta
+                else:    
+                    dout_el, dW, db = affine_relu_backward(dout[i+1], cache[L-i])
+                    
+                dout.append(dout_el)
+
+            
+
             grads['W'+str(L-i)] = dW + reg*W[L-i]
             grads['b'+str(L-i)] = db
           
