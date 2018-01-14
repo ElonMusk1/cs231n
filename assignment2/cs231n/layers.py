@@ -242,6 +242,9 @@ def batchnorm_forward(x, gamma, beta, bn_param):
 
         #store intermediate
         cache = (xhat,gamma,xmu,ivar,sqrtvar,var,eps)
+        
+        running_mean = momentum * running_mean + (1 - momentum) * mu
+        running_var = momentum * running_var + (1 - momentum) * var
         #running_mean = mean
         #running_var = var
         #######################################################################
