@@ -503,7 +503,39 @@ def conv_forward_naive(x, w, b, conv_param):
     # TODO: Implement the convolutional forward pass.                         #
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
-    pass
+    H, W   = x.shape[2], x.shape[3]
+    HH,WW  = w.shape[2], w.shape[3]
+    pad    = conv_param['pad']
+    stride = conv_param['stride']
+    N      = x.shape[0]
+    F      = w.shape[0]
+    C      = x.shape[1]
+    
+    H_out = 1 + (H + 2 * pad - HH) / stride
+    W_out = 1 + (W + 2 * pad - WW) / stride
+    H_out = int(H_out)
+    W_out = int(W_out)
+    
+    out = np.zeros((N, F ,H_out, W_out))
+    
+    x_pad = np.pad(x,((0,0),(0,0),(pad,pad),(pad,pad)),'constant', constant_values = 0)    #добавляем pad
+    
+    for n in range(N):   # цикл по изображениям
+        for f in range(F):       # цикл по фильтрам
+            b0 = b[f] 
+            for i in range(H_out):           # цикл по строкам выходной матрицы
+                for j in range(W_out):       # цикл по столбцам выходной матрицы
+                    s = 0
+                    for c in range(C):       # цикл по каналам изображения
+                        h_begin =(stride*i)
+                        h_end = (HH+stride*i)
+                        w_begin = (stride*j)
+                        w_end = (WW+stride*j)
+                        x0 = x_pad[n][c][h_begin:h_end,w_begin:w_end]
+                        w0 = w[f][c]
+                        s += np.sum(x0*w0)
+                    out[n][f][i][j] = s + b0 
+                
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -528,7 +560,66 @@ def conv_backward_naive(dout, cache):
     ###########################################################################
     # TODO: Implement the convolutional backward pass.                        #
     ###########################################################################
-    pass
+    x, w, b, conv_param = cache
+    
+    H, W   = x.shape[2], x.shape[3]
+    HH,WW  = w.shape[2], w.shape[3]
+    pad    = conv_param['pad']
+    stride = conv_param['stride']
+    N      = x.shape[0]
+    F      = w.shape[0]
+    C      = x.shape[1]
+    
+    H_out = 1 + (H + 2 * pad - HH) / stride
+    W_out = 1 + (W + 2 * pad - WW) / stride
+    H_out = int(H_out)
+    W_out = int(W_out)
+    
+    dw = np.zeros((F, C, HH, WW))
+    dx = np.zeros((N, C, H, W))
+    dx_pad = np.zeros((H+(2*pad), W+(2*pad)))
+    
+    # dw
+    x_pad = np.pad(x,((0,0),(0,0),(pad,pad),(pad,pad)),'constant', constant_values = 0)    #добавляем pad
+    
+    for c in range(C):   # цикл по каналам изображения
+        for f in range(F):       # цикл по фильтрам
+            for i in range(HH):           # цикл по строкам фильтра
+                for j in range(WW):       # цикл по столбцам фильтра
+                    s = 0
+                    for n in range(N):    # цикл по изображениям
+                        h_begin =(stride*i)
+                        h_end = (H_out+stride*i)
+                        w_begin = (stride*j)
+                        w_end = (W_out+stride*j)
+                        #print('{}, {}'.format(i, j))
+                        #print('{}:{} {}:{}'.format(h_begin,h_end,w_begin,w_end))
+                        x0 = x_pad[n][c][h_begin:h_end,w_begin:w_end]
+                        #w0 = w[f][c]
+                        dout0 = dout[n][f]
+                        #print('x0', x0.shape)
+                        #print('dout0', dout0.shape)
+                        s += np.sum(x0*dout0)
+                        
+                    dw[f][c][i][j] = s
+    # dx                
+    for n in range(N):   # цикл по изображениям
+        for c in range(C):        # цикл по каналам изображения
+            dx_pad = np.zeros((H+(2*pad), W+(2*pad)))
+            for i in range(H):           # цикл по строкам входной матрицы
+                for j in range(W):       # цикл по столбцам входной матрицы
+                    for f in range(F):      # цикл по фильтрам
+                        h_begin =(stride*i)
+                        h_end = (HH+stride*i)
+                        w_begin = (stride*j)
+                        w_end = (WW+stride*j)
+                        dout0 = dout[n][f][i][j]
+                        w0 = w[f][c]
+                        dx_pad[h_begin:h_end,w_begin:w_end] += w0*dout0           
+            dx[n][c] = dx_pad[pad:-pad,pad:-pad]
+
+    # db
+    db = np.sum(dout, axis=(0,2,3))
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
