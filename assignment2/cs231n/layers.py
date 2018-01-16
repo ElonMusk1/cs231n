@@ -645,12 +645,34 @@ def max_pool_forward_naive(x, pool_param):
     ###########################################################################
     # TODO: Implement the max pooling forward pass                            #
     ###########################################################################
-    pass
+    N, C, H, W = x.shape
+    pool_height = pool_param['pool_height']
+    pool_width = pool_param['pool_width']
+    stride = pool_param['stride']
+    
+    H_out = 1 + (H - pool_height) / stride
+    W_out = 1 + (W - pool_width) / stride
+    H_out = int(H_out)
+    W_out = int(W_out)
+    
+    out = np.zeros((N, C ,H_out, W_out))
+    
+    for n in range(N):            # цикл по изображениям
+        for c in range(C):        # цикл по каналам изображени
+            for i in range(H_out):           # цикл по строкам выходной матрицы
+                for j in range(W_out):       # цикл по столбцам выходной матрицы
+                    h_begin =(stride*i)
+                    h_end = (pool_height+stride*i)
+                    w_begin = (stride*j)
+                    w_end = (pool_width+stride*j)
+                    out[n][c][i][j] = np.max(x[n][c][h_begin:h_end,w_begin:w_end])
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
     cache = (x, pool_param)
     return out, cache
+
+
 
 
 def max_pool_backward_naive(dout, cache):
@@ -668,11 +690,35 @@ def max_pool_backward_naive(dout, cache):
     ###########################################################################
     # TODO: Implement the max pooling backward pass                           #
     ###########################################################################
-    pass
+    x, pool_param = cache
+    N, C, H, W = x.shape
+    pool_height = pool_param['pool_height']
+    pool_width = pool_param['pool_width']
+    stride = pool_param['stride']
+    
+    H_out = 1 + (H - pool_height) / stride
+    W_out = 1 + (W - pool_width) / stride
+    H_out = int(H_out)
+    W_out = int(W_out)
+    
+    dx = np.zeros(x.shape)
+    
+    for n in range(N):            # цикл по изображениям
+        for c in range(C):        # цикл по каналам изображени
+            for i in range(H_out):           # цикл по строкам выходной матрицы
+                for j in range(W_out):       # цикл по столбцам выходной матрицы
+                    h_begin =(stride*i)
+                    h_end = (pool_height+stride*i)
+                    w_begin = (stride*j)
+                    w_end = (pool_width+stride*j)
+                    x_pool = x[n][c][h_begin:h_end,w_begin:w_end]
+                    mask = (x_pool == np.max(x_pool))
+                    dx[n][c][h_begin:h_end,w_begin:w_end] = mask*dout[n][c][i][j]
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
     return dx
+
 
 
 def spatial_batchnorm_forward(x, gamma, beta, bn_param):
