@@ -569,6 +569,7 @@ def conv_backward_naive(dout, cache):
     N      = x.shape[0]
     F      = w.shape[0]
     C      = x.shape[1]
+    #print('dout', dout.shape)
     
     H_out = 1 + (H + 2 * pad - HH) / stride
     W_out = 1 + (W + 2 * pad - WW) / stride
@@ -606,14 +607,16 @@ def conv_backward_naive(dout, cache):
     for n in range(N):   # цикл по изображениям
         for c in range(C):        # цикл по каналам изображения
             dx_pad = np.zeros((H+(2*pad), W+(2*pad)))
-            for i in range(H):           # цикл по строкам входной матрицы
-                for j in range(W):       # цикл по столбцам входной матрицы
+            for i in range(H_out):           # цикл по строкам входной матрицы
+                for j in range(W_out):       # цикл по столбцам входной матрицы
                     for f in range(F):      # цикл по фильтрам
                         h_begin =(stride*i)
                         h_end = (HH+stride*i)
                         w_begin = (stride*j)
                         w_end = (WW+stride*j)
-                        dout0 = dout[n][f][i][j]
+                        #print('n {}, f {}, i {}, j {}'.format(n,f,i,j))
+                        #dout0 = dout[n][f][i][j]
+                        dout0 = dout[n,f,i,j]
                         w0 = w[f][c]
                         dx_pad[h_begin:h_end,w_begin:w_end] += w0*dout0           
             dx[n][c] = dx_pad[pad:-pad,pad:-pad]
@@ -744,7 +747,6 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     - cache: Values needed for the backward pass
     """
     out, cache = None, None
-
     ###########################################################################
     # TODO: Implement the forward pass for spatial batch normalization.       #
     #                                                                         #
@@ -752,7 +754,20 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     # version of batch normalization defined above. Your implementation should#
     # be very short; ours is less than five lines.                            #
     ###########################################################################
-    pass
+    #out, cache = batchnorm_forward(x, gamma, beta, bn_param)
+    N, C, H, W = x.shape
+    #out = np.zeros(x.shape)
+                
+    # We transpose to get channels as last dim and then reshape to size (-1, C) so we can use normal batchnorm.
+    x_t = x.transpose((0, 2, 3, 1))
+    x_flat = x_t.reshape(-1, x.shape[1])
+
+    out, cache = batchnorm_forward(x_flat, gamma, beta, bn_param)
+
+    # Reshape our results back to our desired shape.
+    out_reshaped = out.reshape(*x_t.shape)
+    out = out_reshaped.transpose((0, 3, 1, 2))            
+        
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -782,7 +797,15 @@ def spatial_batchnorm_backward(dout, cache):
     # version of batch normalization defined above. Your implementation should#
     # be very short; ours is less than five lines.                            #
     ###########################################################################
-    pass
+    # We transpose to get channels as last dim and then reshape to size (-1, C) so we can use normal batchnorm.
+    dout_t = dout.transpose((0, 2, 3, 1))
+    dout_flat = dout_t.reshape(-1, dout.shape[1])
+    
+    dx, dgamma, dbeta = batchnorm_backward(dout_flat, cache)
+    
+    # Reshape our results back to our desired shape.
+    dx_reshaped = dx.reshape(*dout_t.shape)
+    dx = dx_reshaped.transpose((0, 3, 1, 2))  
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
