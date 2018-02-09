@@ -1,3 +1,4 @@
 coco_captioning/*
 imagenet_val_25*
 squeezenet*
+MNIST_data/*
